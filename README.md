@@ -3,15 +3,23 @@
 Read-only MCP server that assembles the full context of a community support ticket from the
 Hackathon Neo4j graph API.
 
-The first release exposes one tool:
+The MVP exposes four tools:
 
 ```text
 get_ticket_context(ticket_id: str, comments_limit: int = 50)
+get_community_overview(product_id: str, from_date: date, to_date: date)
+investigate_product_issue(
+    product_id: str,
+    from_date: date,
+    to_date: date,
+    items_limit: int = 20,
+)
+find_product_owners(product_id: str)
 ```
 
-It returns the ticket, related products, assignees, opener, ordered comments, partial-data
-warnings, and truncation metadata. Account and employee email addresses are intentionally
-excluded from MCP output.
+Together they cover ticket context, product health, issue investigation, and organizational
+ownership. Results include structured partial-data warnings and truncation metadata. Account and
+employee email addresses are intentionally excluded from MCP output.
 
 ## Requirements
 
@@ -77,4 +85,16 @@ An optional real-API smoke test runs only when `GRAPH_API_TOKEN` is present:
 
 ```bash
 RUN_GRAPH_API_SMOKE=1 GRAPH_API_TOKEN=your-token uv run --no-sync pytest -m integration
+```
+
+## Example prompts
+
+```text
+Get the full context for ticket-0001 with at most 10 comments.
+
+Summarize community health for product-0001 from 2026-03-01 through 2026-03-31.
+
+Investigate product-0001 for crashes, refunds, support tickets, and negative reviews during March 2026.
+
+Find the projects, departments, and contributors responsible for product-0001.
 ```
