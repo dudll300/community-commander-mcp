@@ -12,6 +12,16 @@ class InvalidTicketIdError(CommunityCommanderError):
         super().__init__("INVALID_TICKET_ID: ticket_id must not be blank")
 
 
+class ProductNotFoundError(CommunityCommanderError):
+    def __init__(self, product_id: str) -> None:
+        super().__init__(f"PRODUCT_NOT_FOUND: product '{product_id}' was not found")
+
+
+class InvalidDateRangeError(CommunityCommanderError):
+    def __init__(self) -> None:
+        super().__init__("INVALID_DATE_RANGE: from_date must not be after to_date")
+
+
 class GraphApiError(CommunityCommanderError):
     """A sanitized error returned by the upstream graph API adapter."""
 

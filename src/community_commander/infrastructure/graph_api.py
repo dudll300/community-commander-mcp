@@ -20,14 +20,28 @@ from community_commander.domain.errors import (
 from community_commander.domain.models import (
     Account,
     Comment,
+    ContributionEdge,
+    Department,
     Edge,
     Employee,
+    MetricAggregate,
     Product,
+    Project,
     RelationshipPage,
+    Review,
     Ticket,
 )
 
-RelationshipName = Literal["concerns", "assigned-to", "has-comment", "opened"]
+RelationshipName = Literal[
+    "concerns",
+    "assigned-to",
+    "has-comment",
+    "opened",
+    "reviews",
+    "delivers",
+    "owns",
+    "contributes-to",
+]
 ModelT = TypeVar("ModelT", bound=BaseModel)
 Sleep = Callable[[float], Awaitable[None]]
 
@@ -85,6 +99,43 @@ class GraphApiClient:
             f"/v1/nodes/accounts/{_path_segment(account_id)}", Account, "account", account_id
         )
 
+    async def get_review(self, review_id: str) -> Review:
+        return await self._get_model(
+            f"/v1/nodes/reviews/{_path_segment(review_id)}", Review, "review", review_id
+        )
+
+    async def get_project(self, project_id: str) -> Project:
+        return await self._get_model(
+            f"/v1/nodes/projects/{_path_segment(project_id)}", Project, "project", project_id
+        )
+
+    async def get_department(self, department_id: str) -> Department:
+        return await self._get_model(
+            f"/v1/nodes/departments/{_path_segment(department_id)}",
+            Department,
+            "department",
+            department_id,
+        )
+
+    async def aggregate_metric(
+        self, measure: str, product_id: str, from_date: str, to_date: str
+    ) -> MetricAggregate:
+        payload = await self._request_json(
+            "GET",
+            "/v1/metrics/daily",
+            params={
+                "measure": measure,
+                "group_by": "day",
+                "product_id": product_id,
+                "from": from_date,
+                "to": to_date,
+            },
+        )
+        try:
+            return MetricAggregate.model_validate(payload)
+        except ValidationError as exc:
+            raise GraphApiResponseError() from exc
+
     async def list_relationships(
         self,
         relationship: RelationshipName,
@@ -109,7 +160,10 @@ class GraphApiClient:
                 "GET", f"/v1/relationships/{relationship}", params=params
             )
             try:
-                page = RelationshipPage.model_validate(payload)
+                page_model = (
+                    _ContributionPage if relationship == "contributes-to" else RelationshipPage
+                )
+                page = page_model.model_validate(payload)
             except ValidationError as exc:
                 raise GraphApiResponseError() from exc
             items.extend(page.items)
@@ -198,6 +252,10 @@ class GraphApiClient:
 
 class _NotFound(Exception):
     pass
+
+
+class _ContributionPage(RelationshipPage):
+    items: list[ContributionEdge]
 
 
 def _path_segment(value: str) -> str:
