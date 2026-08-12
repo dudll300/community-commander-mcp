@@ -26,14 +26,30 @@ async def test_real_stdio_handshake_discovery_and_tool_call() -> None:
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 tools = await session.list_tools()
-                assert [tool.name for tool in tools.tools] == ["get_ticket_context"]
-                assert tools.tools[0].output_schema is not None
+                assert [tool.name for tool in tools.tools] == [
+                    "get_ticket_context",
+                    "get_community_overview",
+                    "investigate_product_issue",
+                    "find_product_owners",
+                ]
+                assert all(tool.output_schema is not None for tool in tools.tools)
 
                 result = await session.call_tool(
                     "get_ticket_context", {"ticket_id": "ticket-1", "comments_limit": 1}
                 )
                 invalid_result = await session.call_tool(
                     "get_ticket_context", {"ticket_id": "ticket-1", "comments_limit": 0}
+                )
+                overview_result = await session.call_tool(
+                    "get_community_overview",
+                    {
+                        "product_id": "product-1",
+                        "from_date": "2026-01-01",
+                        "to_date": "2026-12-31",
+                    },
+                )
+                owners_result = await session.call_tool(
+                    "find_product_owners", {"product_id": "product-1"}
                 )
         stderr.seek(0)
         stderr_output = stderr.read()
@@ -47,4 +63,10 @@ async def test_real_stdio_handshake_discovery_and_tool_call() -> None:
     assert "email" not in result.structured_content["assignees"][0]
     assert "email" not in result.structured_content["opened_by"][0]
     assert invalid_result.is_error is True
+    assert overview_result.is_error is False
+    assert overview_result.structured_content is not None
+    assert overview_result.structured_content["tickets"]["total"] == 1
+    assert owners_result.is_error is False
+    assert owners_result.structured_content is not None
+    assert "email" not in owners_result.structured_content["contributors"][0]["employee"]
     assert "Traceback" not in stderr_output

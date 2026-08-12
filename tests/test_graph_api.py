@@ -106,6 +106,61 @@ async def test_paginates_relationships_until_cursor_is_absent() -> None:
 
 
 @pytest.mark.asyncio
+async def test_aggregates_metric_with_inclusive_period() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert dict(request.url.params) == {
+            "measure": "crashes",
+            "group_by": "day",
+            "product_id": "product-1",
+            "from": "2026-03-01",
+            "to": "2026-03-31",
+        }
+        return httpx.Response(
+            200,
+            json={
+                "measure": "crashes",
+                "group_by": "day",
+                "total": 12,
+                "rows": [{"key": "2026-03-11", "value": 12}],
+            },
+        )
+
+    async with GraphApiClient(settings(), transport=httpx.MockTransport(handler)) as client:
+        result = await client.aggregate_metric("crashes", "product-1", "2026-03-01", "2026-03-31")
+
+    assert result.total == 12
+
+
+@pytest.mark.asyncio
+async def test_parses_contribution_relationship_properties() -> None:
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(
+            200,
+            json={
+                "count": 1,
+                "limit": 500,
+                "offset": 0,
+                "items": [
+                    {
+                        "from": "employee-1",
+                        "to": "project-1",
+                        "props": {"role": "Engineer", "allocation_percent": 80},
+                    }
+                ],
+            },
+        )
+    )
+
+    async with GraphApiClient(settings(), transport=transport) as client:
+        result = await client.list_relationships("contributes-to", to_id="project-1")
+
+    assert result[0].model_dump()["props"] == {
+        "role": "Engineer",
+        "allocation_percent": 80,
+    }
+
+
+@pytest.mark.asyncio
 async def test_retries_429_and_uses_retry_after() -> None:
     attempts = 0
     sleeps: list[float] = []
